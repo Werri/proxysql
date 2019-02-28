@@ -2077,31 +2077,33 @@ MySQL_ResultSet::MySQL_ResultSet() {
 	reset_pid = true;
         next_result=NULL;
         result=NULL;
+        rresult=NULL;
         multiresultset=false;
 }
 void MySQL_ResultSet::set_result(MYSQL * _my) {
-     if(next_result!=NULL&&next_result->result!=NULL) {
+     if(next_result!=NULL&&next_result->rresult!=NULL) {
         next_result->set_result(_my);
         return;
      }
-     result=_my?mysql_use_result(_my):NULL;
+     rresult=_my?mysql_use_result(_my):NULL;
+     result=rresult;
 }
 
 MYSQL_RES * MySQL_ResultSet::get_result(MYSQL * _my) {
-     if(next_result!=NULL&&next_result->result!=NULL) {
+     if(next_result!=NULL&&next_result->rresult!=NULL) {
         return next_result->get_result(_my);
      }
-     return result;
+     return rresult;
 }
 
 void MySQL_ResultSet::free_result() {
-     if(next_result!=NULL&&next_result->result!=NULL) {
+     if(next_result!=NULL&&next_result->rresult!=NULL) {
        next_result->free_result();
        return;
      }
-     if(result) {
-        mysql_free_result(result);
-        result=NULL;
+     if(rresult) {
+        mysql_free_result(rresult);
+        rresult=NULL;
      }
 }
 
@@ -2114,7 +2116,7 @@ void MySQL_ResultSet::init(MySQL_Protocol *_myprot, MYSQL_RES *_res, MYSQL *_my,
               return;
            }
         } else {
-           if(next_result->result!=NULL) {
+           if(next_result->rresult!=NULL) {
               next_result->init(_myprot,_res,_my,_stmt);
               return;
            }
@@ -2144,6 +2146,7 @@ void MySQL_ResultSet::init(MySQL_Protocol *_myprot, MYSQL_RES *_res, MYSQL *_my,
 	}
 	reset_pid=true;
 	result=_res;
+        rresult=_res;
 	resultset_size=0;
 	num_rows=0;
 	num_fields=mysql_field_count(mysql);
@@ -2159,7 +2162,7 @@ void MySQL_ResultSet::init(MySQL_Protocol *_myprot, MYSQL_RES *_res, MYSQL *_my,
 	resultset_size+=pkt.size;
 	// columns description
 	for (unsigned int i=0; i<num_fields; i++) {
-		MYSQL_FIELD *field=mysql_fetch_field(result);
+		MYSQL_FIELD *field=mysql_fetch_field(rresult);
 		myprot->generate_pkt_field(false,&pkt.ptr,&pkt.size,sid,field->db,field->table,field->org_table,field->name,field->org_name,field->charsetnr,field->length,field->type,field->flags,field->decimals,false,0,NULL,this);
 		//PSarrayOUT->add(pkt.ptr,pkt.size);
 		resultset_size+=pkt.size;
@@ -2234,9 +2237,9 @@ MySQL_ResultSet::~MySQL_ResultSet() {
         {
            delete next_result;
         }
-        if(result) {
-           mysql_free_result(result);
-           result=NULL;
+        if(rresult) {
+           mysql_free_result(rresult);
+           rresult=NULL;
         }
 	PtrSize_t pkt;
 	//if (PSarrayOUT) {
@@ -2254,10 +2257,10 @@ MySQL_ResultSet::~MySQL_ResultSet() {
 }
 
 unsigned int MySQL_ResultSet::add_row(MYSQL_ROW row) {
-        if(next_result!=NULL&&next_result->result!=NULL) {
+        if(next_result!=NULL&&next_result->rresult!=NULL) {
            return next_result->add_row(row);
         }
-	unsigned long *lengths=mysql_fetch_lengths(result);
+	unsigned long *lengths=mysql_fetch_lengths(rresult);
 	unsigned int pkt_length=0;
 	if (myprot) {
 		sid=myprot->generate_pkt_row3(this, &pkt_length, sid, num_fields, lengths, row);
@@ -2278,7 +2281,7 @@ unsigned int MySQL_ResultSet::add_row(MYSQL_ROW row) {
 // so far, used only for prepared statements
 // it assumes that the MYSQL_ROW is an format ready to be sent to the client
 unsigned int MySQL_ResultSet::add_row2(MYSQL_ROWS *row, unsigned char *offset) {
-        if(next_result!=NULL&&next_result->result!=NULL) {
+        if(next_result!=NULL&&next_result->rresult!=NULL) {
            return next_result->add_row2(row,offset);
         }
 	unsigned long length=row->length;
@@ -2323,15 +2326,15 @@ unsigned int MySQL_ResultSet::add_row2(MYSQL_ROWS *row, unsigned char *offset) {
 
 
 void MySQL_ResultSet::add_eof() {
-        if(next_result!=NULL&&next_result->result!=NULL) {
+        if(next_result!=NULL&&next_result->rresult!=NULL) {
            next_result->add_eof();
            return;
         }
 	PtrSize_t pkt;
 	if (myprot) {
-                if(result) {
-                   mysql_free_result(result);
-                   result=NULL;
+                if(rresult) {
+                   mysql_free_result(rresult);
+                   rresult=NULL;
                 }
 		unsigned int nTrx=myds->sess->NumActiveTransactions();
 		uint16_t setStatus = (nTrx ? SERVER_STATUS_IN_TRANS : 0 );
@@ -2364,15 +2367,15 @@ void MySQL_ResultSet::add_eof() {
 }
 
 void MySQL_ResultSet::add_err(MySQL_Data_Stream *_myds) {
-        if(next_result!=NULL&&next_result->result!=NULL) {
+        if(next_result!=NULL&&next_result->rresult!=NULL) {
            next_result->add_err(_myds);
            return;
         }
 	PtrSize_t pkt;
 	if (myprot) {
-                if(result) {
-                   mysql_free_result(result);
-                   result=NULL;
+                if(rresult) {
+                   mysql_free_result(rresult);
+                   rresult=NULL;
                 }
 		MYSQL *_mysql=_myds->myconn->mysql;
 		buffer_to_PSarrayOut();
@@ -2395,7 +2398,7 @@ void MySQL_ResultSet::add_err(MySQL_Data_Stream *_myds) {
 }
 
 bool MySQL_ResultSet::get_resultset(PtrSizeArray *PSarrayFinal) {
-        if(next_result!=NULL&&next_result->result!=NULL) {
+        if(next_result!=NULL&&next_result->rresult!=NULL) {
            if(multiresultset) {
               goto transfer_result_start_label;
            }
@@ -2415,7 +2418,7 @@ transfer_result_start_label:
 }
 
 void MySQL_ResultSet::buffer_to_PSarrayOut(bool _last) {
-        if(next_result!=NULL&&next_result->result!=NULL) {
+        if(next_result!=NULL&&next_result->rresult!=NULL) {
            next_result->buffer_to_PSarrayOut(_last);
            return;
         }
@@ -2436,7 +2439,7 @@ void MySQL_ResultSet::buffer_to_PSarrayOut(bool _last) {
 }
 
 unsigned long long MySQL_ResultSet::current_size() {
-        if(next_result!=NULL&&next_result->result!=NULL) {
+        if(next_result!=NULL&&next_result->rresult!=NULL) {
            return next_result->current_size();
         }
 	unsigned long long intsize=0;

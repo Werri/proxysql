@@ -17,6 +17,7 @@ class MySQL_ResultSet {
 	MySQL_Protocol *myprot;
 	MYSQL *mysql;
 	MYSQL_RES *result;
+        MYSQL_RES *rresult;
 	unsigned int num_fields;
 	unsigned int num_rows;
 	unsigned long long resultset_size;
