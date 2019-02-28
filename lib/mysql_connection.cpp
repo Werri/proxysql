@@ -1053,10 +1053,6 @@ skip_async_next_result_start_error_label:
 						int _myerrno=mysql_errno(mysql);
 						if (_myerrno) {
 							if (myds) {
-                                                                if(MyRS_start) {
-                                                                   MyRS = MyRS_start;
-                                                                }
-
                                                                 MyRS->add_err(myds);
 								NEXT_IMMEDIATE(ASYNC_QUERY_END);
 							}
@@ -1074,8 +1070,6 @@ skip_async_next_result_start_error_label:
                                            }
                                            goto skip_async_next_result_start_error_label;
                                         }
-                                        if(MyRS_start)
-                                           MyRS = MyRS_start;
 
 					NEXT_IMMEDIATE(ASYNC_QUERY_END);
 				}
@@ -1090,11 +1084,6 @@ skip_async_next_result_start_error_label:
 					compute_unknown_transaction_status();
 				}
 			}
-                        if(MyRS) {
-                           delete MyRS;
-                           MyRS = NULL;
-                           MyRS_start = NULL;
-                        }
 			if (mysql_result) {
 				mysql_free_result(mysql_result);
 				mysql_result=NULL;

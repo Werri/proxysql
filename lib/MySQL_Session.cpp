@@ -3048,7 +3048,7 @@ handler_again:
 
 					switch (status) {
 						case PROCESSING_QUERY:
-							MySQL_Result_to_MySQL_wire(myconn->mysql, myconn->MyRS);
+							MySQL_Result_to_MySQL_wire(myconn->mysql, myconn->MyRS_start ? myconn->MyRS_start : myconn->MyRS);
 							break;
 						case PROCESSING_STMT_PREPARE:
 							{
@@ -4742,6 +4742,11 @@ void MySQL_Session::MySQL_Stmt_Result_to_MySQL_wire(MYSQL_STMT *stmt, MySQL_Conn
 			client_myds->pkt_sid++;
 		}
 	}
+}
+
+void MySQL_Session::MySQL_Result_to_MySQL_wire_sp(MySQL_Connection * myconn, MySQL_Data_Stream *_myds) {
+     MySQL_ResultSet * MyRS = myconn->MyRS_start ? myconn->MyRS_start : myconn->MyRS;
+     MySQL_Result_to_MySQL_wire(myconn->mysql, MyRS, _myds);
 }
 
 void MySQL_Session::MySQL_Result_to_MySQL_wire(MYSQL *mysql, MySQL_ResultSet *MyRS, MySQL_Data_Stream *_myds) {
