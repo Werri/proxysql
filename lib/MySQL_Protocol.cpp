@@ -48,7 +48,7 @@ static void __dump_pkt(const char *func, unsigned char *_ptr, unsigned int len) 
 		}
    }
 	fprintf(stderr,"\n\n");
-	
+
 
 }
 #endif
@@ -119,7 +119,7 @@ static inline int write_encoded_length_and_string(unsigned char *p, uint64_t val
 
 void proxy_compute_sha1_hash_multi(uint8 *digest, const char *buf1, int len1, const char *buf2, int len2) {
   PROXY_TRACE();
-  
+
   SHA_CTX sha1_context;
   SHA1_Init(&sha1_context);
   SHA1_Update(&sha1_context, buf1, len1);
@@ -129,7 +129,7 @@ void proxy_compute_sha1_hash_multi(uint8 *digest, const char *buf1, int len1, co
 
 void proxy_compute_sha1_hash(uint8 *digest, const char *buf, int len) {
   PROXY_TRACE();
-  
+
   SHA_CTX sha1_context;
   SHA1_Init(&sha1_context);
   SHA1_Update(&sha1_context, buf, len);
@@ -240,7 +240,7 @@ static uint8_t mysql_encode_length(uint64_t len, char *hd) {
 	if (len < 65536) { if (hd) { *hd=0xfc; }; return 3; }
 	if (len < 16777216) { if (hd) { *hd=0xfd; }; return 4; }
 	if (hd) { *hd=0xfe; }
-	return 9;	
+	return 9;
 }
 
 
@@ -308,7 +308,7 @@ int pkt_ok(unsigned char *pkt, unsigned int length, MySQL_Protocol *mp) {
 	}
 
 	proxy_debug(PROXY_DEBUG_MYSQL_PROTOCOL,1,"OK Packet <affected_rows:%u insert_id:%u status:%u warns:%u msg:%s>\n", (uint32_t)affected_rows, (uint32_t)insert_id, (uint16_t)mp->prot_status, (uint16_t)warns, msg);
-	
+
 	return PKT_PARSED;
 }
 
@@ -365,7 +365,7 @@ void MySQL_Protocol::init(MySQL_Data_Stream **__myds, MySQL_Connection_userinfo 
 }
 
 int MySQL_Protocol::parse_mysql_pkt(PtrSize_t *PS_entry, MySQL_Data_Stream *__myds) {
-	unsigned char *pkt=(unsigned char *)PS_entry->ptr;	
+	unsigned char *pkt=(unsigned char *)PS_entry->ptr;
 	enum mysql_data_stream_status *DSS=&(*myds)->DSS;
 
 	mysql_hdr hdr;
@@ -414,7 +414,7 @@ int MySQL_Protocol::parse_mysql_pkt(PtrSize_t *PS_entry, MySQL_Data_Stream *__my
 			switch (cmd) {
 				case COM_QUERY:
 					if (pkt_com_query(payload, hdr.pkt_length)==PKT_PARSED) {
-						//*states=STATE_CLIENT_COM_QUERY;
+						// *states=STATE_CLIENT_COM_QUERY;
 						return PKT_PARSED;
 					}
 					break;
@@ -440,11 +440,11 @@ int MySQL_Protocol::parse_mysql_pkt(PtrSize_t *PS_entry, MySQL_Data_Stream *__my
 				default:
 					return PKT_ERROR; // from the server we expect either an OK or an ERR. Everything else is wrong
 			}
-			
+
 		// TO BE REMOVED: end
 			break;
 	}
-	
+
 	return PKT_ERROR;
 }
 
@@ -511,7 +511,7 @@ bool MySQL_Protocol::generate_pkt_EOF(bool send, void **ptr, unsigned int *len, 
 	}
 	memcpy(_ptr+l, &warnings, sizeof(uint16_t)); l+=sizeof(uint16_t);
 	memcpy(_ptr+l, &internal_status, sizeof(uint16_t));
-	
+
 	if (send==true) {
 		(*myds)->PSarrayOUT->add((void *)_ptr,size);
 		switch ((*myds)->DSS) {
@@ -551,7 +551,7 @@ bool MySQL_Protocol::generate_pkt_ERR(bool send, void **ptr, unsigned int *len, 
 	_ptr[l]='#'; l++;
 	memcpy(_ptr+l, sql_state, 5); l+=5;
 	if (sql_message) memcpy(_ptr+l, sql_message, sql_message_len);
-	
+
 	if (send==true) {
 		(*myds)->PSarrayOUT->add((void *)_ptr,size);
 		switch ((*myds)->DSS) {
@@ -800,7 +800,7 @@ bool MySQL_Protocol::generate_pkt_field(bool send, void **ptr, unsigned int *len
 	_ptr[l]=0x00; l++;
 	if (field_list) {
 		l+=write_encoded_length_and_string(_ptr+l, strlen(defvalue), defvalue_length_len, defvalue_length_prefix, defvalue);
-	} 
+	}
 	//else _ptr[l]=0x00;
 	//else fprintf(stderr,"current deflen=%d, defstrlen=%d, namelen=%d, namestrlen=%d, l=%d\n", def_len, def_strlen, name_len, name_strlen, l);
 	if (send==true) { (*myds)->PSarrayOUT->add((void *)_ptr,size); }
@@ -1216,7 +1216,7 @@ bool MySQL_Protocol::process_pkt_OK(unsigned char *pkt, unsigned int len) {
 	}
 
 	proxy_debug(PROXY_DEBUG_MYSQL_PROTOCOL,1,"OK Packet <affected_rows:%u insert_id:%u status:%u warns:%u msg:%s>\n", (uint32_t)affected_rows, (uint32_t)insert_id, (uint16_t)prot_status, (uint16_t)warns, msg);
-	
+
 	return true;
 }
 
@@ -1627,7 +1627,7 @@ __do_auth:
 		// this is a workaround for bug #603
 		if (
 			((*myds)->sess->session_type == PROXYSQL_SESSION_ADMIN)
-		|| 
+		||
 			((*myds)->sess->session_type == PROXYSQL_SESSION_STATS) 
 		) {
 			if (strcmp((const char *)user,mysql_thread___monitor_username)==0) {
@@ -2075,8 +2075,50 @@ stmt_execute_metadata_t * MySQL_Protocol::get_binds_from_pkt(void *ptr, unsigned
 MySQL_ResultSet::MySQL_ResultSet() {
 	buffer = NULL;
 	reset_pid = true;
+        next_result=NULL;
+        result=NULL;
+        multiresultset=false;
 }
+void MySQL_ResultSet::set_result(MYSQL * _my) {
+     if(next_result!=NULL&&next_result->result!=NULL) {
+        next_result->set_result(_my);
+        return;
+     }
+     result=_my?mysql_use_result(_my):NULL;
+}
+
+MYSQL_RES * MySQL_ResultSet::get_result(MYSQL * _my) {
+     if(next_result!=NULL&&next_result->result!=NULL) {
+        return next_result->get_result(_my);
+     }
+     return result;
+}
+
+void MySQL_ResultSet::free_result() {
+     if(next_result!=NULL&&next_result->result!=NULL) {
+       next_result->free_result();
+       return;
+     }
+     if(result) {
+        mysql_free_result(result);
+        result=NULL;
+     }
+}
+
 void MySQL_ResultSet::init(MySQL_Protocol *_myprot, MYSQL_RES *_res, MYSQL *_my, MYSQL_STMT *_stmt) {
+        if(next_result==NULL)
+        {
+           next_result=_stmt == NULL ? new MySQL_ResultSet() : NULL;
+           if(multiresultset&&next_result) {
+              next_result->init(_myprot,_res,_my,_stmt);
+              return;
+           }
+        } else {
+           if(next_result->result!=NULL) {
+              next_result->init(_myprot,_res,_my,_stmt);
+              return;
+           }
+        }
 	transfer_started=false;
 	resultset_completed=false;
 	myprot=_myprot;
@@ -2188,6 +2230,14 @@ void MySQL_ResultSet::init(MySQL_Protocol *_myprot, MYSQL_RES *_res, MYSQL *_my,
 }
 
 MySQL_ResultSet::~MySQL_ResultSet() {
+        if(next_result!=NULL)
+        {
+           delete next_result;
+        }
+        if(result) {
+           mysql_free_result(result);
+           result=NULL;
+        }
 	PtrSize_t pkt;
 	//if (PSarrayOUT) {
 		while (PSarrayOUT.len) {
@@ -2204,6 +2254,9 @@ MySQL_ResultSet::~MySQL_ResultSet() {
 }
 
 unsigned int MySQL_ResultSet::add_row(MYSQL_ROW row) {
+        if(next_result!=NULL&&next_result->result!=NULL) {
+           return next_result->add_row(row);
+        }
 	unsigned long *lengths=mysql_fetch_lengths(result);
 	unsigned int pkt_length=0;
 	if (myprot) {
@@ -2225,6 +2278,9 @@ unsigned int MySQL_ResultSet::add_row(MYSQL_ROW row) {
 // so far, used only for prepared statements
 // it assumes that the MYSQL_ROW is an format ready to be sent to the client
 unsigned int MySQL_ResultSet::add_row2(MYSQL_ROWS *row, unsigned char *offset) {
+        if(next_result!=NULL&&next_result->result!=NULL) {
+           return next_result->add_row2(row,offset);
+        }
 	unsigned long length=row->length;
 
 	uint8_t pkt_sid=sid;
@@ -2264,14 +2320,34 @@ unsigned int MySQL_ResultSet::add_row2(MYSQL_ROWS *row, unsigned char *offset) {
 	return length;
 }
 
+
+
 void MySQL_ResultSet::add_eof() {
+        if(next_result!=NULL&&next_result->result!=NULL) {
+           next_result->add_eof();
+           return;
+        }
 	PtrSize_t pkt;
 	if (myprot) {
+                if(result) {
+                   mysql_free_result(result);
+                   result=NULL;
+                }
 		unsigned int nTrx=myds->sess->NumActiveTransactions();
 		uint16_t setStatus = (nTrx ? SERVER_STATUS_IN_TRANS : 0 );
 		if (myds->sess->autocommit) setStatus += SERVER_STATUS_AUTOCOMMIT;
 		setStatus |= ( mysql->server_status & ~SERVER_STATUS_AUTOCOMMIT ); // get flags from server_status but ignore autocommit
 		setStatus = setStatus & ~SERVER_STATUS_CURSOR_EXISTS; // Do not send cursor #1128
+                if(mysql ? mysql_more_results(mysql) : 0) {
+                   if(mysql_next_result(mysql)) {
+                      setStatus |= SERVER_MORE_RESULTS_EXIST;
+                      multiresultset=true;
+                   } else {
+                      setStatus = setStatus & ~SERVER_MORE_RESULTS_EXIST;
+                   }
+                } else {
+                   setStatus = setStatus & ~SERVER_MORE_RESULTS_EXIST;
+                }
 		//myprot->generate_pkt_EOF(false,&pkt.ptr,&pkt.size,sid,0,mysql->server_status|setStatus);
 		//PSarrayOUT->add(pkt.ptr,pkt.size);
 		//sid++;
@@ -2288,8 +2364,16 @@ void MySQL_ResultSet::add_eof() {
 }
 
 void MySQL_ResultSet::add_err(MySQL_Data_Stream *_myds) {
+        if(next_result!=NULL&&next_result->result!=NULL) {
+           next_result->add_err(_myds);
+           return;
+        }
 	PtrSize_t pkt;
 	if (myprot) {
+                if(result) {
+                   mysql_free_result(result);
+                   result=NULL;
+                }
 		MYSQL *_mysql=_myds->myconn->mysql;
 		buffer_to_PSarrayOut();
 		char sqlstate[10];
@@ -2311,16 +2395,30 @@ void MySQL_ResultSet::add_err(MySQL_Data_Stream *_myds) {
 }
 
 bool MySQL_ResultSet::get_resultset(PtrSizeArray *PSarrayFinal) {
+        if(next_result!=NULL&&next_result->result!=NULL) {
+           if(multiresultset) {
+              goto transfer_result_start_label;
+           }
+transfer_result_finish_label:
+           return next_result->get_resultset(PSarrayFinal);
+        }
+transfer_result_start_label:
 	transfer_started=true;
 	if (myprot) {
 		PSarrayFinal->copy_add(&PSarrayOUT,0,PSarrayOUT.len);
 		while (PSarrayOUT.len)
 			PSarrayOUT.remove_index(PSarrayOUT.len-1,NULL);
 	}
-	return resultset_completed;
+        if(multiresultset) {
+           goto transfer_result_finish_label;
+        }
 }
 
 void MySQL_ResultSet::buffer_to_PSarrayOut(bool _last) {
+        if(next_result!=NULL&&next_result->result!=NULL) {
+           next_result->buffer_to_PSarrayOut(_last);
+           return;
+        }
 	if (buffer_used==0)
 		return;	// exit immediately if the buffer is empty
 	if (buffer_used < RESULTSET_BUFLEN/2) {
@@ -2338,6 +2436,9 @@ void MySQL_ResultSet::buffer_to_PSarrayOut(bool _last) {
 }
 
 unsigned long long MySQL_ResultSet::current_size() {
+        if(next_result!=NULL&&next_result->result!=NULL) {
+           return next_result->current_size();
+        }
 	unsigned long long intsize=0;
 	intsize+=sizeof(MySQL_ResultSet);
 	intsize+=RESULTSET_BUFLEN; // size of buffer

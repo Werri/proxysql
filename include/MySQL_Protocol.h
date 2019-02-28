@@ -34,6 +34,11 @@ class MySQL_ResultSet {
 	unsigned int buffer_used;
 	void buffer_to_PSarrayOut(bool _last=false);
 	unsigned long long current_size();
+        MySQL_ResultSet * next_result;
+        void set_result(MYSQL * _my);
+        MYSQL_RES * get_result(MYSQL * _my);
+        void free_result();
+        bool multiresultset=false;
 };
 
 class MySQL_Prepared_Stmt_info {

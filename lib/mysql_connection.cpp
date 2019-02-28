@@ -223,6 +223,7 @@ MySQL_Connection::MySQL_Connection() {
 	multiplex_delayed=false;
 	MyRS=NULL;
 	MyRS_reuse=NULL;
+        MyRS_start=NULL;
 	unknown_transaction_status = false;
 	creation_time=0;
 	auto_increment_delay_token = 0;
@@ -252,14 +253,24 @@ MySQL_Connection::~MySQL_Connection() {
 		close_mysql(); // this take care of closing mysql connection
 		mysql=NULL;
 	}
+        if(MyRS_start) {
+          delete MyRS_start;
+          MyRS_start=NULL;
+          MyRS=NULL;
+          MyRS_reuse = NULL;
+          goto skip_MyRS_free;
+        }
+
 	if (MyRS) {
 		delete MyRS;
 		MyRS = NULL;
 	}
+        MyRS_reuse = NULL;
 	if (MyRS_reuse) {
 		delete MyRS_reuse;
 		MyRS_reuse = NULL;
 	}
+skip_MyRS_free:
 	if (query.stmt) {
 		query.stmt=NULL;
 	}
@@ -914,10 +925,12 @@ handler_again:
 //			break;
 
 		case ASYNC_NEXT_RESULT_START:
+                        goto skip_async_next_result_start_error_label;
 			async_exit_status = mysql_next_result_start(&interr, mysql);
 			if (async_exit_status) {
 				next_event(ASYNC_NEXT_RESULT_CONT);
 			} else {
+skip_async_next_result_start_error_label:
 #ifdef PROXYSQL_USE_RESULT
 				NEXT_IMMEDIATE(ASYNC_USE_RESULT_START);
 #else
@@ -967,11 +980,15 @@ handler_again:
 			if (mysql_errno(mysql)) {
 				NEXT_IMMEDIATE(ASYNC_QUERY_END);
 			}
-			mysql_result=mysql_use_result(mysql);
-			if (mysql_result==NULL) {
+                        if(MyRS == NULL) {
+                           MyRS = new MySQL_ResultSet();
+                        }
+                        MyRS->set_result(mysql);
+			mysql_result=NULL;
+			if (MyRS->get_result(mysql)==NULL) {
 				NEXT_IMMEDIATE(ASYNC_QUERY_END);
 			} else {
-				if (myds->sess->mirror==false) {
+				/*if (myds->sess->mirror==false) {
 					if (MyRS_reuse == NULL) {
 						MyRS = new MySQL_ResultSet();
 						MyRS->init(&myds->sess->client_myds->myprot, mysql_result, mysql);
@@ -989,7 +1006,8 @@ handler_again:
 						MyRS_reuse = NULL;
 						MyRS->init(NULL, mysql_result, mysql);
 					}
-				}
+				}*/
+                                MyRS->init(myds->sess->mirror ? NULL : &myds->sess->client_myds->myprot, MyRS->get_result(mysql), mysql);
 				async_fetch_row_start=false;
 				NEXT_IMMEDIATE(ASYNC_USE_RESULT_CONT);
 			}
@@ -1007,10 +1025,10 @@ handler_again:
 				}
 			}
 			if (async_fetch_row_start==false) {
-				async_exit_status=mysql_fetch_row_start(&mysql_row,mysql_result);
+				async_exit_status=mysql_fetch_row_start(&mysql_row,MyRS->get_result(mysql));
 				async_fetch_row_start=true;
 			} else {
-				async_exit_status=mysql_fetch_row_cont(&mysql_row,mysql_result, mysql_status(event, true));
+				async_exit_status=mysql_fetch_row_cont(&mysql_row,MyRS->get_result(mysql), mysql_status(event, true));
 			}
 			if (async_exit_status) {
 				next_event(ASYNC_USE_RESULT_CONT);
@@ -1035,13 +1053,30 @@ handler_again:
 						int _myerrno=mysql_errno(mysql);
 						if (_myerrno) {
 							if (myds) {
-								MyRS->add_err(myds);
+                                                                if(MyRS_start) {
+                                                                   MyRS = MyRS_start;
+                                                                }
+
+                                                                MyRS->add_err(myds);
 								NEXT_IMMEDIATE(ASYNC_QUERY_END);
 							}
 						}
 					}
 					// we reach here if there was no error
 					MyRS->add_eof();
+                                        if(MyRS->result==NULL) {
+                                           mysql_result=NULL;
+                                        }
+                                        if(MyRS->multiresultset) {
+                                           MyRS_start=MyRS_start ? MyRS_start : MyRS;
+                                           if(MyRS->next_result) {
+                                              MyRS = MyRS->next_result;
+                                           }
+                                           goto skip_async_next_result_start_error_label;
+                                        }
+                                        if(MyRS_start)
+                                           MyRS = MyRS_start;
+
 					NEXT_IMMEDIATE(ASYNC_QUERY_END);
 				}
 			}
@@ -1055,6 +1090,11 @@ handler_again:
 					compute_unknown_transaction_status();
 				}
 			}
+                        if(MyRS) {
+                           delete MyRS;
+                           MyRS = NULL;
+                           MyRS_start = NULL;
+                        }
 			if (mysql_result) {
 				mysql_free_result(mysql_result);
 				mysql_result=NULL;
@@ -1583,13 +1623,13 @@ void MySQL_Connection::async_free_result() {
 	}
 	compute_unknown_transaction_status();
 	async_state_machine=ASYNC_IDLE;
-	if (MyRS) {
+	/*if (MyRS) {
 		if (MyRS_reuse) {
 			delete (MyRS_reuse);
 		}
 		MyRS_reuse = MyRS;
 		MyRS=NULL;
-	}
+	}*/
 }
 
 
