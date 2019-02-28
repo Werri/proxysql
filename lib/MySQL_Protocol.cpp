@@ -2117,8 +2117,10 @@ void MySQL_ResultSet::init(MySQL_Protocol *_myprot, MYSQL_RES *_res, MYSQL *_my,
            }
         } else {
            if(next_result->rresult!=NULL) {
-              next_result->init(_myprot,_res,_my,_stmt);
-              return;
+              if(!(rresult==NULL&&result!=NULL)) {
+                next_result->init(_myprot,_res,_my,_stmt);
+                return;
+              }
            }
         }
 	transfer_started=false;
