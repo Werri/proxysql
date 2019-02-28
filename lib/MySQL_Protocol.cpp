@@ -2108,6 +2108,9 @@ void MySQL_ResultSet::free_result() {
 }
 
 void MySQL_ResultSet::init(MySQL_Protocol *_myprot, MYSQL_RES *_res, MYSQL *_my, MYSQL_STMT *_stmt) {
+        if(result!=NULL&&rresult==NULL){
+           goto result_direct_init_label;
+        }
         if(next_result==NULL)
         {
            next_result=_stmt == NULL ? new MySQL_ResultSet() : NULL;
@@ -2117,12 +2120,15 @@ void MySQL_ResultSet::init(MySQL_Protocol *_myprot, MYSQL_RES *_res, MYSQL *_my,
            }
         } else {
            if(next_result->rresult!=NULL) {
-              if(!(rresult==NULL&&result!=NULL)) {
                 next_result->init(_myprot,_res,_my,_stmt);
                 return;
-              }
+           } else if(next_result->result!=NULL) {
+                next_result->init(_myprot,_res,_my,_stmt);
+                return;
            }
         }
+result_direct_init_label:
+        multiresultset=false;
 	transfer_started=false;
 	resultset_completed=false;
 	myprot=_myprot;
