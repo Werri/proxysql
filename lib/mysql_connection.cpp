@@ -214,6 +214,7 @@ MySQL_Connection::MySQL_Connection() {
 	options.time_zone_int=0;	// #819
 	compression_pkt_id=0;
 	mysql_result=NULL;
+        tmysql_result=NULL;
 	query.ptr=NULL;
 	query.length=0;
 	query.stmt=NULL;
@@ -985,7 +986,8 @@ skip_async_next_result_start_error_label:
                         }
                         MyRS->set_result(mysql);
 			mysql_result=NULL;
-			if (MyRS->get_result(mysql)==NULL) {
+                        tmysql_result=MyRS->get_result(mysql);
+			if (tmysql_result==NULL) {
 				NEXT_IMMEDIATE(ASYNC_QUERY_END);
 			} else {
 				/*if (myds->sess->mirror==false) {
@@ -1007,7 +1009,7 @@ skip_async_next_result_start_error_label:
 						MyRS->init(NULL, mysql_result, mysql);
 					}
 				}*/
-                                MyRS->init(myds->sess->mirror ? NULL : &myds->sess->client_myds->myprot, MyRS->get_result(mysql), mysql);
+                                MyRS->init(myds->sess->mirror ? NULL : &myds->sess->client_myds->myprot, tmysql_result, mysql);
 				async_fetch_row_start=false;
 				NEXT_IMMEDIATE(ASYNC_USE_RESULT_CONT);
 			}

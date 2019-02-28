@@ -18,6 +18,7 @@ class MySQL_ResultSet {
 	MYSQL *mysql;
 	MYSQL_RES *result;
         MYSQL_RES *rresult;
+        MYSQL_RES *tresult;
 	unsigned int num_fields;
 	unsigned int num_rows;
 	unsigned long long resultset_size;

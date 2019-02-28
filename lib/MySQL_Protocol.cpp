@@ -2078,6 +2078,7 @@ MySQL_ResultSet::MySQL_ResultSet() {
         next_result=NULL;
         result=NULL;
         rresult=NULL;
+        tresult=NULL;
         multiresultset=false;
 }
 void MySQL_ResultSet::set_result(MYSQL * _my) {
@@ -2085,15 +2086,16 @@ void MySQL_ResultSet::set_result(MYSQL * _my) {
         next_result->set_result(_my);
         return;
      }
-     rresult=_my?mysql_use_result(_my):NULL;
-     result=rresult;
+     tresult=NULL;
+     tresult=_my?mysql_use_result(_my):NULL;
 }
 
 MYSQL_RES * MySQL_ResultSet::get_result(MYSQL * _my) {
      if(next_result!=NULL&&next_result->rresult!=NULL) {
         return next_result->get_result(_my);
      }
-     return rresult;
+     MYSQL_RES * ret = tresult ? tresult : rresult;
+     return ret;
 }
 
 void MySQL_ResultSet::free_result() {
