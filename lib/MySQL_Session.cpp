@@ -3048,7 +3048,8 @@ handler_again:
 
 					switch (status) {
 						case PROCESSING_QUERY:
-							MySQL_Result_to_MySQL_wire(myconn->mysql, myconn->MyRS_start ? myconn->MyRS_start : myconn->MyRS);
+							//MySQL_Result_to_MySQL_wire(myconn->mysql, myconn->MyRS);
+                                                        MySQL_Result_to_MySQL_wire_sp(myconn);
 							break;
 						case PROCESSING_STMT_PREPARE:
 							{
@@ -3348,7 +3349,8 @@ handler_again:
 							switch (status) {
 								case PROCESSING_QUERY:
 									if (myconn) {
-										MySQL_Result_to_MySQL_wire(myconn->mysql, myconn->MyRS, myds);
+										//MySQL_Result_to_MySQL_wire(myconn->mysql, myconn->MyRS, myds);
+                                                                                MySQL_Result_to_MySQL_wire_sp(myconn,myds);
 									} else {
 										MySQL_Result_to_MySQL_wire(NULL, NULL, myds);
 									}
@@ -3419,7 +3421,8 @@ handler_again:
 								break;
 							// rc==2 : a multi-resultset (or multi statement) was detected, and the current statement is completed
 							case 2:
-								MySQL_Result_to_MySQL_wire(myconn->mysql, myconn->MyRS);
+								//MySQL_Result_to_MySQL_wire(myconn->mysql, myconn->MyRS);
+                                                                MySQL_Result_to_MySQL_wire_sp(myconn);
 								  /*if (myconn->MyRS) { // we also need to clear MyRS, so that the next staement will recreate it if needed
 										if (myconn->MyRS_reuse) {
 											delete myconn->MyRS_reuse;
